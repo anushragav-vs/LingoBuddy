@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>LingoBuddy — Anxiety-Free Language Conversation Simulator</title>
+  <meta name="description" content="A personalized, anxiety-free foreign language conversation simulator powered by local AI and Web Speech API.">
+  <meta name="theme-color" content="#07090e">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>">
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              400: '#34d399',
+              500: '#10b981',
+              600: '#059669',
+            },
+            cyanAccent: {
+              400: '#22d3ee',
+              500: '#06b6d4',
+              600: '#0891b2',
+            },
+            darkBg: '#07090e',
+            glassBg: 'rgba(20, 28, 48, 0.65)',
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Custom Glassmorphism Styles -->
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body class="text-slate-100 flex flex-col min-h-screen selection:bg-cyan-500 selection:text-white">
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <!-- App Header & Global Navigation -->
+  <header class="sticky top-0 z-40 border-b border-white/10 glass-panel">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-3 cursor-pointer" id="nav-brand-logo">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center text-xl shadow-lg shadow-emerald-500/20">
+          🗣️
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-emerald-400 via-cyan-300 to-white bg-clip-text text-transparent">LingoBuddy</span>
+            <span class="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">PWA</span>
+          </div>
+          <p class="text-xs text-slate-400 font-medium hidden sm:block">Anxiety-Free Conversation Simulator</p>
+        </div>
+      </div>
+
+      <!-- Center / Controls: Target Language & Speech Rate -->
+      <div class="flex items-center gap-2 sm:gap-4">
+        <!-- Target Language Selector -->
+        <div class="relative">
+          <select id="header-lang-select" class="appearance-none bg-slate-900/80 hover:bg-slate-800 text-slate-200 text-xs sm:text-sm font-semibold rounded-xl pl-3 pr-8 py-2 border border-white/10 focus:outline-none focus:border-cyan-400 cursor-pointer transition">
+            <option value="es-ES">🇪🇸 Spanish</option>
+            <option value="fr-FR">🇫🇷 French</option>
+            <option value="de-DE">🇩🇪 German</option>
+            <option value="it-IT">🇮🇹 Italian</option>
+            <option value="ja-JP">🇯🇵 Japanese</option>
+            <option value="zh-CN">🇨🇳 Mandarin</option>
+          </select>
+          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+          </div>
+        </div>
+
+        <!-- Speech Pace Speed Toggle (0.75x slow vs 1.0x normal) -->
+        <button id="toggle-speech-rate-btn" title="Toggle audio playback speed (Slow / Normal)" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-white/10 text-xs font-semibold text-cyan-300 transition">
+          <span id="speech-rate-icon">🐢</span>
+          <span id="speech-rate-label" class="hidden md:inline">0.85x</span>
+        </button>
+
+        <!-- Streak Counter -->
+        <div class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs sm:text-sm font-bold">
+          <span>🔥</span>
+          <span id="header-streak-count">1</span>
+          <span class="hidden sm:inline text-xs text-amber-400/80 font-normal">Day</span>
+        </div>
+
+        <!-- Profile Button -->
+        <button id="btn-open-profile" title="User Profile" class="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-white/10 transition">
+          <span id="header-avatar" class="text-base">🌱</span>
+          <span id="header-user-name" class="text-xs sm:text-sm font-semibold max-w-[80px] truncate hidden sm:inline">Alex</span>
+        </button>
+
+        <!-- Settings Button -->
+        <button id="btn-open-settings" title="Ollama & System Settings" class="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main View Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col">
+
+    <!-- ========================================== -->
+    <!-- VIEW 1: DASHBOARD & SCENARIO SELECTION     -->
+    <!-- ========================================== -->
+    <section id="view-dashboard" class="flex flex-col gap-8 transition-opacity duration-300">
+      
+      <!-- Hero Welcome Card -->
+      <div class="relative overflow-hidden rounded-3xl glass-panel p-6 sm:p-8 border border-white/10">
+        <div class="absolute -right-16 -top-16 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -left-16 -bottom-16 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        
+        <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div class="max-w-2xl">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold mb-3">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              Anxiety-Free Safe Zone
+            </div>
+            <h1 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white mb-2" id="hero-greeting">
+              Welcome back, Alex!
+            </h1>
+            <p class="text-slate-300 text-sm sm:text-base leading-relaxed">
+              Practice conversational speaking at your own pace without judgment. Click any scenario below to start a real-time roleplay. Stuck on a sentence? Tap the <span class="inline-block px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">[?]</span> Anxiety Shield anytime for translations and grammar tips!
+            </p>
+          </div>
+
+          <!-- Quick Status Pill -->
+          <div class="flex flex-col sm:flex-row md:flex-col gap-3 shrink-0">
+            <div class="flex items-center gap-3 px-4 py-3 rounded-2xl bg-slate-900/60 border border-white/10">
+              <span class="text-2xl">🤖</span>
+              <div>
+                <p class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">AI Inference Engine</p>
+                <div class="flex items-center gap-2">
+                  <span id="ai-engine-status-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  <span id="ai-engine-status-text" class="text-xs font-bold text-slate-200">Local Ollama Ready</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress & Fluency Statistics Board -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <!-- Metric 1: Sentences Spoken -->
+        <div class="rounded-2xl glass-card p-5 border border-white/10 flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-400 mb-2">
+            <span class="text-xs font-medium uppercase tracking-wider">Sentences Spoken</span>
+            <span class="text-lg">💬</span>
+          </div>
+          <div>
+            <div class="text-2xl sm:text-3xl font-extrabold text-white" id="stat-sentences-count">0</div>
+            <p class="text-xs text-emerald-400 mt-1 flex items-center gap-1">
+              <span>↑</span> Active verbal practice
+            </p>
+          </div>
+        </div>
+
+        <!-- Metric 2: Active Streak -->
+        <div class="rounded-2xl glass-card p-5 border border-white/10 flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-400 mb-2">
+            <span class="text-xs font-medium uppercase tracking-wider">Current Streak</span>
+            <span class="text-lg">🔥</span>
+          </div>
+          <div>
+            <div class="text-2xl sm:text-3xl font-extrabold text-amber-400" id="stat-streak-count">1 Day</div>
+            <p class="text-xs text-slate-400 mt-1">Keep the momentum going!</p>
+          </div>
+        </div>
+
+        <!-- Metric 3: Fluency & Confidence Score -->
+        <div class="rounded-2xl glass-card p-5 border border-white/10 flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-400 mb-2">
+            <span class="text-xs font-medium uppercase tracking-wider">Fluency Score</span>
+            <span class="text-lg">📈</span>
+          </div>
+          <div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-2xl sm:text-3xl font-extrabold text-cyan-400" id="stat-fluency-score">42%</span>
+              <span class="text-xs text-slate-400">Confidence</span>
+            </div>
+            <!-- Progress bar -->
+            <div class="w-full bg-slate-800 rounded-full h-1.5 mt-2 overflow-hidden">
+              <div id="stat-fluency-bar" class="bg-gradient-to-r from-cyan-500 to-emerald-400 h-1.5 rounded-full transition-all duration-500" style="width: 42%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metric 4: Vocabulary Mastered -->
+        <div class="rounded-2xl glass-card p-5 border border-white/10 flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-400 mb-2">
+            <span class="text-xs font-medium uppercase tracking-wider">Words Mastered</span>
+            <span class="text-lg">🧠</span>
+          </div>
+          <div>
+            <div class="text-2xl sm:text-3xl font-extrabold text-purple-400" id="stat-words-count">4</div>
+            <p class="text-xs text-slate-400 mt-1">Acquired through speech</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conversational Scenarios Section -->
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-xl font-bold text-white tracking-tight">Select a Conversation Scenario</h2>
+            <p class="text-xs sm:text-sm text-slate-400">Choose a realistic roleplay environment tailored to everyday life</p>
+          </div>
+          <span class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-800 border border-white/10 text-slate-300" id="current-language-badge">
+            🇪🇸 Spanish Mode
+          </span>
+        </div>
+
+        <!-- Scenarios Grid -->
+        <div id="scenarios-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <!-- Dynamically populated by app.js -->
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ========================================== -->
+    <!-- VIEW 2: INTERACTIVE DUAL-MODALITY CHAT     -->
+    <!-- ========================================== -->
+    <section id="view-chat" class="hidden flex-1 flex flex-col h-[calc(100vh-140px)] min-h-[500px]">
+      
+      <!-- Chat Header Bar -->
+      <div class="rounded-2xl glass-panel px-4 py-3 border border-white/10 mb-4 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
+          <button id="btn-back-to-dashboard" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-white/10 text-slate-300 hover:text-white transition flex items-center gap-1.5 text-xs font-semibold">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            <span>Exit</span>
+          </button>
+          
+          <div class="flex items-center gap-2.5">
+            <span id="chat-scenario-icon" class="text-2xl">☕</span>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 id="chat-scenario-title" class="font-bold text-sm sm:text-base text-white">At a Coffee Shop</h3>
+                <span id="chat-partner-role" class="text-[11px] px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-medium">Mateo • Barista</span>
+              </div>
+              <p id="chat-scenario-location" class="text-xs text-slate-400">Café Luz, Downtown</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Side: Scenario Goal Pill & Clear History -->
+        <div class="flex items-center gap-2">
+          <button id="btn-show-scenario-goals" title="View Scenario Objectives" class="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-white/10 text-xs text-slate-300 transition">
+            <span>🎯</span> Goals
+          </button>
+          <button id="btn-restart-chat" title="Restart Conversation" class="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 hover:border-rose-500/40 text-slate-400 hover:text-rose-300 border border-white/10 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Messages Stream (Scrollable) -->
+      <div id="chat-messages-container" class="flex-1 overflow-y-auto pr-1 space-y-4 flex flex-col rounded-2xl glass-panel-subtle p-4 border border-white/5 mb-4">
+        <!-- Messages dynamically rendered here -->
+      </div>
+
+      <!-- Hands-Free Voice & Text Control Dock -->
+      <div class="rounded-2xl glass-panel p-3 sm:p-4 border border-white/10 voice-dock shrink-0">
+        
+        <!-- Status Indicator Bar -->
+        <div class="flex items-center justify-between pb-2 mb-2 border-b border-white/5 text-xs">
+          <!-- Voice State Indicator -->
+          <div class="flex items-center gap-2" id="voice-state-indicator">
+            <div id="voice-state-dot" class="w-2.5 h-2.5 rounded-full bg-slate-500"></div>
+            <span id="voice-state-label" class="font-medium text-slate-400">Microphone Ready</span>
+          </div>
+
+          <!-- Audio Equalizer Bars (visible during speaking) -->
+          <div id="speaking-wave-bars" class="hidden items-center gap-1 h-4">
+            <span class="soundwave-bar h-2"></span>
+            <span class="soundwave-bar h-4"></span>
+            <span class="soundwave-bar h-5"></span>
+            <span class="soundwave-bar h-3"></span>
+            <span class="text-[11px] text-cyan-300 ml-1 font-medium">Playing audio...</span>
+          </div>
+
+          <!-- Stop audio button if speaking -->
+          <button id="btn-stop-audio" class="hidden px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-semibold hover:bg-rose-500/30">
+            ⏹ Stop Audio
+          </button>
+        </div>
+
+        <!-- Live Transcription Preview (Shows while listening) -->
+        <div id="live-transcription-preview" class="hidden mb-3 p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs sm:text-sm text-emerald-200 animate-pulse">
+          <span class="text-emerald-400 font-bold mr-1">Listening:</span>
+          <span id="live-transcript-text">...</span>
+        </div>
+
+        <!-- Controls: Big Mic Button + Text Input -->
+        <div class="flex items-center gap-2 sm:gap-3">
+          
+          <!-- Large Hands-Free Mic Button -->
+          <div class="relative flex items-center justify-center shrink-0">
+            <!-- Pulsing ring (visible when listening) -->
+            <div id="mic-pulse-ring" class="hidden absolute w-14 h-14 rounded-full bg-emerald-400/30 animate-pulse-ring pointer-events-none"></div>
+            
+            <button id="btn-mic-toggle" class="relative z-10 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-white flex items-center justify-center shadow-lg shadow-emerald-500/25 transition-all transform active:scale-95 focus:outline-none" title="Hold or Click to Speak">
+              <svg id="mic-icon-svg" class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Dual Text Input Field -->
+          <div class="flex-1 relative flex items-center">
+            <input 
+              type="text" 
+              id="chat-text-input" 
+              placeholder="Speak using the mic or type your response in Spanish..." 
+              class="w-full bg-slate-900/90 text-slate-100 placeholder-slate-500 text-xs sm:text-sm rounded-2xl pl-4 pr-12 py-3.5 border border-white/10 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition"
+              autocomplete="off"
+            />
+            
+            <button id="btn-send-message" class="absolute right-2 p-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 transition" title="Send message (Enter)">
+              <svg class="w-4 h-4 transform rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- MODAL: SETTINGS & LOCAL OLLAMA CONFIG      -->
+  <!-- ========================================== -->
+  <div id="modal-settings" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="w-full max-w-lg rounded-3xl glass-panel p-6 sm:p-8 border border-white/10 shadow-2xl relative">
+      <div class="flex items-center justify-between pb-4 border-b border-white/10 mb-5">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-lg">⚙️</div>
+          <div>
+            <h3 class="text-lg font-bold text-white">Local AI & Speech Settings</h3>
+            <p class="text-xs text-slate-400">Configure local Ollama connection parameters</p>
+          </div>
+        </div>
+        <button id="btn-close-settings" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">✕</button>
+      </div>
+
+      <div class="space-y-4 text-xs sm:text-sm">
+        <!-- Ollama Endpoint URL -->
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1" for="input-ollama-url">Ollama Local API Endpoint</label>
+          <input type="text" id="input-ollama-url" value="http://localhost:11434/v1/chat/completions" class="w-full bg-slate-900 text-slate-100 rounded-xl px-3.5 py-2.5 border border-white/10 font-mono text-xs focus:outline-none focus:border-cyan-400">
+          <p class="text-[11px] text-slate-400 mt-1">Default OpenAI-compatible URL for local Ollama instance.</p>
+        </div>
+
+        <!-- Model Name -->
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1" for="input-ollama-model">Ollama Model Name</label>
+          <input type="text" id="input-ollama-model" value="qwen2.5:latest" class="w-full bg-slate-900 text-slate-100 rounded-xl px-3.5 py-2.5 border border-white/10 font-mono text-xs focus:outline-none focus:border-cyan-400">
+          <p class="text-[11px] text-slate-400 mt-1">Recommended: <span class="text-cyan-300">qwen2.5:latest</span>, <span class="text-cyan-300">llama3:latest</span>, or <span class="text-cyan-300">mistral</span>.</p>
+        </div>
+
+        <!-- Persona Tone -->
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1" for="select-persona-tone">Conversation Persona Tone</label>
+          <select id="select-persona-tone" class="w-full bg-slate-900 text-slate-100 rounded-xl px-3.5 py-2.5 border border-white/10 focus:outline-none focus:border-cyan-400 cursor-pointer">
+            <option value="gentle_tutor">Gentle Tutor (Patient, clear, encouraging)</option>
+            <option value="friendly_native">Friendly Native (Natural, conversational, warm)</option>
+            <option value="lively_local">Lively Local (Authentic everyday slang and energy)</option>
+          </select>
+        </div>
+
+        <!-- Fallback Engine Preference -->
+        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-white/5">
+          <div>
+            <p class="font-semibold text-slate-200">Force Autonomous Fallback</p>
+            <p class="text-[11px] text-slate-400">Run embedded zero-delay simulation without contacting Ollama.</p>
+          </div>
+          <input type="checkbox" id="check-force-fallback" class="w-4 h-4 rounded text-cyan-500 focus:ring-0 cursor-pointer">
+        </div>
+
+        <!-- Connection Test Box -->
+        <div class="p-3.5 rounded-xl bg-slate-900/80 border border-white/10 flex flex-col gap-2">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-slate-300">Ping Ollama Server:</span>
+            <button id="btn-test-connection" class="px-3 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 font-semibold text-xs transition">
+              ⚡ Test Connection
+            </button>
+          </div>
+          <div id="test-connection-result" class="text-xs text-slate-400 italic">Click test to check localhost:11434 status.</div>
+        </div>
+
+        <!-- Danger Zone: Reset Data -->
+        <div class="pt-2 border-t border-white/5 flex items-center justify-between">
+          <button id="btn-reset-all-data" class="text-xs text-rose-400 hover:text-rose-300 underline">
+            Reset All Progress & Scores
+          </button>
+        </div>
+      </div>
+
+      <!-- Footer Buttons -->
+      <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-white/10">
+        <button id="btn-cancel-settings" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs font-semibold transition">Cancel</button>
+        <button id="btn-save-settings" class="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold text-xs shadow-lg shadow-emerald-500/20 hover:opacity-90 transition">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: USER PROFILE & NATIVE LANGUAGE      -->
+  <!-- ========================================== -->
+  <div id="modal-profile" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="w-full max-w-md rounded-3xl glass-panel p-6 sm:p-8 border border-white/10 shadow-2xl relative">
+      <div class="flex items-center justify-between pb-4 border-b border-white/10 mb-5">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <span>🌱</span> Learner Profile
+        </h3>
+        <button id="btn-close-profile" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">✕</button>
+      </div>
+
+      <div class="space-y-4 text-xs sm:text-sm">
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1" for="input-profile-name">Your Display Name</label>
+          <input type="text" id="input-profile-name" value="Alex" class="w-full bg-slate-900 text-slate-100 rounded-xl px-3.5 py-2.5 border border-white/10 text-xs sm:text-sm focus:outline-none focus:border-cyan-400">
+        </div>
+
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Pick Avatar Emoji</label>
+          <div class="flex items-center gap-2" id="avatar-picker-grid">
+            <button class="avatar-option p-2 rounded-xl bg-slate-800 border border-cyan-400 text-xl" data-avatar="🌱">🌱</button>
+            <button class="avatar-option p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-xl" data-avatar="🚀">🚀</button>
+            <button class="avatar-option p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-xl" data-avatar="☕">☕</button>
+            <button class="avatar-option p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-xl" data-avatar="🎧">🎧</button>
+            <button class="avatar-option p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-xl" data-avatar="🌟">🌟</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-white/10">
+        <button id="btn-save-profile" class="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold text-xs shadow-lg shadow-emerald-500/20 hover:opacity-90 transition">Save Profile</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: SCENARIO OBJECTIVES & HINTS         -->
+  <!-- ========================================== -->
+  <div id="modal-scenario-goals" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="w-full max-w-md rounded-3xl glass-panel p-6 sm:p-8 border border-white/10 shadow-2xl relative">
+      <div class="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <span>🎯</span> Conversation Objectives
+        </h3>
+        <button id="btn-close-scenario-goals" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">✕</button>
+      </div>
+
+      <p class="text-xs text-slate-300 mb-4">Try to naturally achieve these conversational milestones in your conversation:</p>
+      <ul id="scenario-goals-list" class="space-y-2 text-xs sm:text-sm text-slate-200">
+        <!-- Dynamically populated -->
+      </ul>
+
+      <div class="mt-6 pt-4 border-t border-white/10 flex justify-end">
+        <button id="btn-ack-goals" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-200 hover:bg-slate-700 text-xs font-semibold transition">Got it!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main ES6 Application Controller -->
+  <script type="module" src="assets/js/app.js"></script>
+
+  <!-- Service Worker Registration for PWA -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => {
+          console.warn('[PWA] Service worker registration error:', err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
